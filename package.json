@@ -1,0 +1,61 @@
+{
+  "name": "hugo-tags-helper",
+  "displayName": "Hugo Tags Helper",
+  "description": "Provides minor intellisense when using tags in frontmatter",
+  "version": "1.0.0",
+  "publisher": "kaellarkin",
+  "repository": {
+    "url": "https://github.com/kfreon/hugo-vscode-shortcode-syntax-highlighting.git",
+    "type": "git"
+  },
+  "engines": {
+    "vscode": "^1.41.1"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "Hugo"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "hugo-tags-helper.regenerateTags",
+        "title": "Regenerate Hugo Tags"
+      }
+    ]
+  },
+  "icon": "icon.png",
+  "main": "./out/extension.js",
+  "capabilities": {
+    "completionProvider": {
+      "resolveProvider": true,
+      "triggerCharacters": [
+        "\"",
+        "'"
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.41.1",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^7.4.0",
+    "@typescript-eslint/parser": "^7.4.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.3.3",
+    "@vscode/test-cli": "^0.0.8",
+    "@vscode/test-electron": "^2.3.9"
+  }
+}
