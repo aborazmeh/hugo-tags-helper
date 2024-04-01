@@ -2,7 +2,7 @@
   "name": "hugo-tags-helper",
   "displayName": "Hugo Tags Helper",
   "description": "Provides minor intellisense when using tags in frontmatter",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "kaellarkin",
   "repository": {
     "url": "https://github.com/KFreon/hugo-tags-helper.git",
