@@ -19,6 +19,14 @@ export async function activate(context: vscode.ExtensionContext) {
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand("hugo-tags-helper.test", async () => {
+			const tagLines = await getTagsFromFile(vscode.window.activeTextEditor?.document.uri.fsPath ?? '');
+			const tags = parseTags(tagLines);
+			console.log('RESULT', tagLines, tags);
+		})
+	);
+
+	context.subscriptions.push(
 		vscode.languages.registerCompletionItemProvider('markdown', new HugoTagsHelperProvider(context.workspaceState), '"', "'")
 	);
 }
@@ -36,6 +44,9 @@ async function generateTagList(context: vscode.ExtensionContext) {
 		const files = await vscode.workspace.findFiles("**/index.md");
 		const allTags = new Set<string>();
 		for (let f of files) {
+			if (token.isCancellationRequested) {
+				break;
+			}
 			const tagLines = await getTagsFromFile(f.fsPath);
 			const tags = parseTags(tagLines);
 			tags.forEach(t => allTags.add(t));
@@ -57,7 +68,6 @@ async function getTagsFromFile(filePath: string): Promise<string[]> {
 	try {
 		let index = 0;
 		for await (const line of readInterface) {
-			// Note yaml and toml only
 			if (index === 0 && !isAFrontmatterLine(line)) {
 				// No frontmatter
 				return [];
@@ -78,8 +88,10 @@ async function getTagsFromFile(filePath: string): Promise<string[]> {
 				if (isEnd) {
 					return tagLines;
 				}
+				continue;
 			}
 
+			// End of the tags array
 			if (isEnd) {
 				tagLines.push(trimmed);
 				return tagLines;
@@ -102,21 +114,17 @@ async function getTagsFromFile(filePath: string): Promise<string[]> {
 function parseTags(lines: string[]): string[] {
 	const tags = lines.flatMap(line => {
 		const matches = line.matchAll(/[\"\']([^\"\']*)[\"\']/g);
-		const things = [...matches];
-		console.log('line', line, matches)
-		return things
-		.flatMap(x => {
-			console.log('groups', x.groups)
-			return x.groups?.[1]
-		})
-		.filter(x => !!x)
-		.map(x => x as string);
+		return [...matches]
+			.map(x => x[1])
+			.filter(x => !!x)
+			.map(x => x as string);
 	});
 
-	let allTags = new Set<string>(tags);
-	return [...allTags];
+	let distinctTags = new Set<string>(tags);
+	return [...distinctTags];
 }
 
+// Only yaml or toml
 function isAFrontmatterLine(line: string) {
 	return line.includes('---') || line.includes('+++');
 }

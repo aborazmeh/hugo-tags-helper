@@ -2,7 +2,7 @@
   "name": "hugo-tags-helper",
   "displayName": "Hugo Tags Helper",
   "description": "Provides minor intellisense when using tags in frontmatter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "kaellarkin",
   "repository": {
     "url": "https://github.com/KFreon/hugo-tags-helper.git",
@@ -25,6 +25,10 @@
       {
         "command": "hugo-tags-helper.regenerateTags",
         "title": "Regenerate Hugo Tags"
+      },
+      {
+        "command": "hugo-tags-helper.test",
+        "title": "DONOTUSE: Parse hugo tags in this document"
       }
     ]
   },

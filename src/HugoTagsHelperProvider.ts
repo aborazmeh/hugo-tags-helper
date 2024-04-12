@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { knownHugoTagsKey } from './extension';
 
-export const supportedTagsStart = ["tags:", "tags="];
+export const supportedTagsStart = ["tags:", "tags=", "tags ="];
 
 export class HugoTagsHelperProvider implements vscode.CompletionItemProvider {
 	private workspaceState: vscode.Memento;
@@ -35,6 +35,8 @@ export class HugoTagsHelperProvider implements vscode.CompletionItemProvider {
 			if (isEndOfTags && lineIdx < position.line) {
 				return [];
 			}
+			
+			lineIdx--;
 		}
 
 		const tags = this.workspaceState.get<string[]>(knownHugoTagsKey, []);
