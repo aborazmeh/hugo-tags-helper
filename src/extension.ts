@@ -1,26 +1,26 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as readline from 'readline'
-import { HugoTagsHelperProvider } from './HugoTagsHelperProvider';
+import * as readline from 'readline';
+import { HugoTagsHelperProvider, supportedTagsStart } from './HugoTagsHelperProvider';
 
-export const knownHugoTagsKey = "knownHugoTags"
-const hugoTagsLastUpdatedKey = 'hugoTagsLastUpdated'
+export const knownHugoTagsKey = "knownHugoTags";
+const hugoTagsLastUpdatedKey = 'hugoTagsLastUpdated';
 
 export async function activate(context: vscode.ExtensionContext) {
-	const lastGenerated = context.workspaceState.get<Date>(hugoTagsLastUpdatedKey, new Date(0))
+	const lastGenerated = context.workspaceState.get<Date>(hugoTagsLastUpdatedKey, new Date(0));
 	const currentDate = new Date();
-	const lastWeek = new Date(currentDate.setDate(currentDate.getDate() - 7))
+	const lastWeek = new Date(currentDate.setDate(currentDate.getDate() - 7));
 	if (lastGenerated < lastWeek) {
-		await generateTagList(context)
+		await generateTagList(context);
 	}
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("hugo-tags-helper.regenerateTags", async () => await generateTagList(context))
-	)
+	);
 
 	context.subscriptions.push(
 		vscode.languages.registerCompletionItemProvider('markdown', new HugoTagsHelperProvider(context.workspaceState), '"', "'")
-	)
+	);
 }
 
 async function generateTagList(context: vscode.ExtensionContext) {
@@ -33,56 +33,90 @@ async function generateTagList(context: vscode.ExtensionContext) {
 			console.log("User canceled the long running operation");
 		});
 
-		const files = await vscode.workspace.findFiles("**/index.md")
+		const files = await vscode.workspace.findFiles("**/index.md");
 		const allTags = new Set<string>();
 		for (let f of files) {
-			const tags = await getTags(f.fsPath)
-			tags.forEach(t => allTags.add(t))
+			const tagLines = await getTagsFromFile(f.fsPath);
+			const tags = parseTags(tagLines);
+			tags.forEach(t => allTags.add(t));
 		}
 
-		const strings = Array.from(allTags)
-		await context.workspaceState.update(knownHugoTagsKey, strings)
-		await context.workspaceState.update(hugoTagsLastUpdatedKey, new Date())
+		const strings = Array.from(allTags);
+		await context.workspaceState.update(knownHugoTagsKey, strings);
+		await context.workspaceState.update(hugoTagsLastUpdatedKey, new Date());
 
-		progress.report({message: 'Finished!'})
-	})
+		progress.report({message: 'Finished!'});
+	});
 }
 
-async function getTags(filePath: string) {
-	let allTags = new Set<string>();
-	const stream = fs.createReadStream(filePath)
-	const readInterface = readline.createInterface(stream)
+async function getTagsFromFile(filePath: string): Promise<string[]> {
+	const stream = fs.createReadStream(filePath);
+	const readInterface = readline.createInterface(stream);
+	let tagLines = [];
+	let foundStart = false;
 	try {
-		let index = 0
+		let index = 0;
 		for await (const line of readInterface) {
-			// Note yaml only
-			if (index === 0 && !line.startsWith('---')) {
+			// Note yaml and toml only
+			if (index === 0 && !isAFrontmatterLine(line)) {
 				// No frontmatter
-				return new Set<string>();
-			} else if (index !== 0 && line.startsWith('---')) {
+				return [];
+			} else if (index !== 0 && isAFrontmatterLine(line)) {
 				// End of frontmatter, didn't find tags
-				return new Set<string>();
+				return [];
 			}
 
-			const isTagLine = line.trim().startsWith('tags:')
-			if (isTagLine) {
-				const tags = line
-					.split('[')
-					.slice(1)[0]
-					.replace("]", "")
-					.split(',')
-					.map(x => x.replaceAll('"', '').replace("'", "").trim())
+			const trimmed = line.trim();
 
-				allTags = new Set<string>(tags)
-				return allTags;
+			const isEnd = trimmed.includes(']');
+			
+			if (!foundStart && supportedTagsStart.some(x => trimmed.startsWith(x))) {
+				foundStart = true;
+				tagLines.push(trimmed);
+
+				// If it's all one line, just return now
+				if (isEnd) {
+					return tagLines;
+				}
+			}
+
+			if (isEnd) {
+				tagLines.push(trimmed);
+				return tagLines;
+			}
+
+			if (foundStart) {
+				tagLines.push(trimmed);
 			}
 
 			index++;
 		}
-		return allTags;
 	}
 	finally {
 		stream.destroy(); // Destroy file stream.
 	}
+
+	return [];
 }
 
+function parseTags(lines: string[]): string[] {
+	const tags = lines.flatMap(line => {
+		const matches = line.matchAll(/[\"\']([^\"\']*)[\"\']/g);
+		const things = [...matches];
+		console.log('line', line, matches)
+		return things
+		.flatMap(x => {
+			console.log('groups', x.groups)
+			return x.groups?.[1]
+		})
+		.filter(x => !!x)
+		.map(x => x as string);
+	});
+
+	let allTags = new Set<string>(tags);
+	return [...allTags];
+}
+
+function isAFrontmatterLine(line: string) {
+	return line.includes('---') || line.includes('+++');
+}
