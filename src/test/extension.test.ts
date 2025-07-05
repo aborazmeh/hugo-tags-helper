@@ -1,15 +1,28 @@
-import * as assert from 'assert';
+import * as assert from "assert";
+import { getTagsFromReadStream } from "../extension";
 
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
-import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+suite("getTagsFromReadStream", () => {
+	test("extracts tags from single-line frontmatter", async () => {
+		const lines = ["---", 'tags: [ "tag1", "tag2", "tag3" ]', "---"];
+		const result = await getTagsFromReadStream(lines.join("\n"));
+		assert.deepStrictEqual(result, ["tag1", "tag2", "tag3"]);
+	});
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+	test("returns empty if no frontmatter", async () => {
+		const lines = ["no tags here"];
+		const result = await getTagsFromReadStream(lines.join("\n"));
+		assert.deepStrictEqual(result, []);
+	});
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	test("extracts multiline tag arrays", async () => {
+		const lines = ["---", "tags: [", '"tag1",', '"tag2",', '"tag3"', "]", "---"];
+		const result = await getTagsFromReadStream(lines.join("\n"));
+		assert.deepStrictEqual(result, ["tag1", "tag2", "tag3"]);
+	});
+
+	test("returns empty if frontmatter ends before tag block", async () => {
+		const lines = ["---", 'title: "test"', "---", 'tags: [ "tag1" ]'];
+		const result = await getTagsFromReadStream(lines.join("\n"));
+		assert.deepStrictEqual(result, []);
 	});
 });

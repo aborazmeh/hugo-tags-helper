@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as readline from 'readline';
-import { HugoTagsHelperProvider, supportedTagsStart } from './HugoTagsHelperProvider';
+import matter from 'gray-matter';
+import { HugoTagsHelperProvider } from './HugoTagsHelperProvider';
 
 export const knownHugoTagsKey = "knownHugoTags";
 const hugoTagsLastUpdatedKey = 'hugoTagsLastUpdated';
@@ -20,9 +20,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("hugo-tags-helper.test", async () => {
-			const tagLines = await getTagsFromFile(vscode.window.activeTextEditor?.document.uri.fsPath ?? '');
-			const tags = parseTags(tagLines);
-			console.log('RESULT', tagLines, tags);
+			const tags = await getTagsFromFile(vscode.window.activeTextEditor?.document.uri.fsPath ?? "");
+			console.log('RESULT', tags);
 		})
 	);
 
@@ -47,8 +46,7 @@ async function generateTagList(context: vscode.ExtensionContext) {
 			if (token.isCancellationRequested) {
 				break;
 			}
-			const tagLines = await getTagsFromFile(f.fsPath);
-			const tags = parseTags(tagLines);
+			const tags = await getTagsFromFile(f.fsPath);
 			tags.forEach(t => allTags.add(t));
 		}
 
@@ -60,71 +58,17 @@ async function generateTagList(context: vscode.ExtensionContext) {
 	});
 }
 
-async function getTagsFromFile(filePath: string): Promise<string[]> {
-	const stream = fs.createReadStream(filePath);
-	const readInterface = readline.createInterface(stream);
-	let tagLines = [];
-	let foundStart = false;
-	try {
-		let index = 0;
-		for await (const line of readInterface) {
-			if (index === 0 && !isAFrontmatterLine(line)) {
-				// No frontmatter
-				return [];
-			} else if (index !== 0 && isAFrontmatterLine(line)) {
-				// End of frontmatter, didn't find tags
-				return [];
-			}
+export async function getTagsFromReadStream(content: string): Promise<string[]> {
+	const { data } = matter(content);
 
-			const trimmed = line.trim();
-
-			const isEnd = trimmed.includes(']');
-			
-			if (!foundStart && supportedTagsStart.some(x => trimmed.startsWith(x))) {
-				foundStart = true;
-				tagLines.push(trimmed);
-
-				// If it's all one line, just return now
-				if (isEnd) {
-					return tagLines;
-				}
-				continue;
-			}
-
-			// End of the tags array
-			if (isEnd) {
-				tagLines.push(trimmed);
-				return tagLines;
-			}
-
-			if (foundStart) {
-				tagLines.push(trimmed);
-			}
-
-			index++;
-		}
-	}
-	finally {
-		stream.destroy(); // Destroy file stream.
+	if (data && data.tags) {
+		return Array.isArray(data.tags) ? data.tags : [data.tags];
 	}
 
 	return [];
 }
 
-function parseTags(lines: string[]): string[] {
-	const tags = lines.flatMap(line => {
-		const matches = line.matchAll(/[\"\']([^\"\']*)[\"\']/g);
-		return [...matches]
-			.map(x => x[1])
-			.filter(x => !!x)
-			.map(x => x as string);
-	});
-
-	let distinctTags = new Set<string>(tags);
-	return [...distinctTags];
-}
-
-// Only yaml or toml
-function isAFrontmatterLine(line: string) {
-	return line.includes('---') || line.includes('+++');
+async function getTagsFromFile(filePath: string): Promise<string[]> {
+	const fileContent = fs.readFileSync(filePath, 'utf8');
+	return getTagsFromReadStream(fileContent);
 }
